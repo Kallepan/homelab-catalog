@@ -50,6 +50,7 @@ build operator image:
   stage: build
   image: $CI_REGISTRY_IMAGE/opm:$OPM_VERSION
   before_script:
+    - update-ca-certificates
     - until docker info; do sleep 10; done
     - echo "$IAC_OPERATORS_READ_REGISTRY_ACCESS_TOKEN" | docker login -u "operators" $CI_REGISTRY --password-stdin
   script:
