@@ -38,7 +38,7 @@ build opm image:
     - |
       if ! docker pull $CI_REGISTRY_IMAGE/opm:$OPM_VERSION; then
         # Build and push the opm image
-        docker build --build-arg GOLANG_VERSION=$GO_VERSION -f opm.Dockerfile -t $CI_REGISTRY_IMAGE/opm:$OPM_VERSION .
+        docker build --build-arg OPM_VERSION=$OPM_VERSION -f opm.Dockerfile -t $CI_REGISTRY_IMAGE/opm:$OPM_VERSION .
         docker push $CI_REGISTRY_IMAGE/opm:$OPM_VERSION
       else
         echo "OPM image already exists. Skipping build."
