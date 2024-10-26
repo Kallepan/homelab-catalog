@@ -1,0 +1,6 @@
+Schema: olm.semver
+GenerateMajorChannels: true
+GenerateMinorChannels: false
+Stable:
+  Bundles:
+   - Image: registry.srv-lab.server.home/homelab/iac/operators/rq-operator/bundle:0.0.1

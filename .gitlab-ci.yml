@@ -1,0 +1,62 @@
+variables:
+  # Docker
+  DOCKER_HOST: tcp://docker:2376
+  DOCKER_TLS_VERIFY: "1"
+  DOCKER_TLS_CERTDIR: "/certs"
+  DOCKER_CERT_PATH: "$DOCKER_TLS_CERTDIR/client"
+
+  # Build
+  OPM_VERSION: v1.47.0
+
+stages:
+  - prepare
+  - build
+
+.rules-template:
+  rules:
+    - if: $CI_COMMIT_TAG
+
+# Ugly workaround to get docker:dind working
+services:
+  - name: docker:dind
+    alias: docker
+    command:
+      - /bin/sh
+      - -c
+      - "update-ca-certificates && dockerd-entrypoint.sh || exit"
+
+# Build the builder image
+build opm image:
+  extends: .rules-template
+  stage: prepare
+  image: docker:cli
+  before_script:
+    - until docker info; do sleep 1; done
+    # Docker login
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - |
+      if ! docker pull $CI_REGISTRY_IMAGE/opm:$OPM_VERSION; then
+        # Build and push the opm image
+        docker build --build-arg GOLANG_VERSION=$GO_VERSION -f opm.Dockerfile -t $CI_REGISTRY_IMAGE/opm:$OPM_VERSION .
+        docker push $CI_REGISTRY_IMAGE/opm:$OPM_VERSION
+      else
+        echo "OPM image already exists. Skipping build."
+      fi
+
+# Build the operator image
+build operator image:
+  extends: .rules-template
+  stage: build
+  image: $CI_REGISTRY_IMAGE/opm:$OPM_VERSION
+  before_script:
+    - until docker info; do sleep 10; done
+    - echo "$IAC_OPERATORS_READ_REGISTRY_ACCESS_TOKEN" | docker login -u "operators" $CI_REGISTRY --password-stdin
+  script:
+    # Render the operator template
+    - opm alpha render-template semver -o yaml < operator-template.yaml > homelab-catalog/catalog.yaml
+    # Login to the GitLab Container of the project
+    - echo "$CI_JOB_TOKEN" | docker login $CI_REGISTRY -u "$CI_REGISTRY_USER" --password-stdin
+    # Build and push the operator image
+    - docker build -t $CI_REGISTRY_IMAGE:$CI_COMMIT_TAG -f homelab-catalog.Dockerfile .
+    - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_TAG
